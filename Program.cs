@@ -16,7 +16,7 @@ try
 
     Console.Write("Enter destination folder path: ");
     var destinationFolderPath = (Console.ReadLine() ?? string.Empty).Trim();
-
+    
     if (string.IsNullOrWhiteSpace(destinationFolderPath)) {
         throw new ArgumentException("Destination file path is required.");
     }
