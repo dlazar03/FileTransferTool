@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Security.Cryptography;
 using System.Text;
 
 namespace FileTransferTool
@@ -9,6 +10,8 @@ namespace FileTransferTool
         public async Task TransferAsync(string sourceFilePath, string destinationFilePath, CancellationToken cancellationToken) {
             const int chunkSize = 1024 * 1024;
             var buffer = new byte[chunkSize];
+
+            using var fileHasher = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
 
             using var sourceFileStream = 
                 new FileStream(sourceFilePath, FileMode.Open, FileAccess.Read, 
@@ -29,13 +32,20 @@ namespace FileTransferTool
                 long chunkPositionStart = sourceFileStream.Position - readCount;
                 long chunkPositionEnd = sourceFileStream.Position;
 
-                Console.WriteLine($"Current chunk processing: {chunkIndex}");
+                ReadOnlySpan<byte> currentChunk = new(buffer, 0, (int)readCount);
+                byte[] hashBytes = MD5.HashData(currentChunk);
+                string currentChunkHash = Convert.ToHexString(hashBytes);
+                fileHasher.AppendData(buffer, 0, (int)readCount);
+
+                Console.WriteLine($"Current chunk processing: {chunkIndex}, current chunk hash: {currentChunkHash}");
                 Console.WriteLine($"Chunk start at byte: {chunkPositionStart} end at byte: {chunkPositionEnd}, chunk size: {readCount}");
 
-                await destinationFileStream.WriteAsync(buffer, cancellationToken);
+                await destinationFileStream.WriteAsync(buffer.AsMemory(0, (int)readCount), cancellationToken);
                 chunkIndex++;
             }
-            Console.WriteLine("Transfer completed.");
+            byte[] fileHashBytes = fileHasher.GetHashAndReset();
+            string fileHash = Convert.ToHexString(fileHashBytes);
+            Console.WriteLine($"File transfer completed. File hash: {fileHash}");
         }
     }
 }
