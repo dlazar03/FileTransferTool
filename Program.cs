@@ -31,9 +31,14 @@ try
         throw new InvalidOperationException("Source and destination file paths are the same file, provide different path.");
     }
 
-    var fileService = new FileTransferService();
+    var transferData = new TransferData { 
+        SourceFilePath = fullSourcePath,
+        DestinationFilePath = fullDestinationPath
+    };
+
+    var fileService = new FileTransferService(transferData);
     var cancellationToken = new CancellationTokenSource();
-    await fileService.TransferAsync(fullSourcePath, fullDestinationPath, cancellationToken.Token);
+    await fileService.TransferAsync(cancellationToken.Token);
 
     return 0;
 }
