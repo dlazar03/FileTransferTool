@@ -68,8 +68,8 @@ namespace FileTransferTool
             return fileChunks;
         }
 
-        private async Task<int> WriteChunkWithRetryAsync(
-            FileStream destinationFileStream,
+        public async Task<int> WriteChunkWithRetryAsync(
+            Stream destinationFileStream,
             byte[] sourceBuffer, 
             byte[] destinationBuffer,
             ChunkContext chunk,
@@ -172,6 +172,6 @@ namespace FileTransferTool
             }
         }
 
-        private readonly record struct ChunkContext(int Index, long Offset, int Length, string ExpectedMd5Hash);
+        public readonly record struct ChunkContext(int Index, long Offset, int Length, string ExpectedMd5Hash);
     }
 }
