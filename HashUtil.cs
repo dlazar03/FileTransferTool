@@ -9,19 +9,16 @@ namespace FileTransferTool
     {
         public static string GenerateMd5Hash(ReadOnlySpan<byte> chunk) {
             byte[] hashBytes = MD5.HashData(chunk);
-            string currentSourceChunkMd5Hash = Convert.ToHexString(hashBytes).ToLowerInvariant();
-            return currentSourceChunkMd5Hash;
+            return Convert.ToHexString(hashBytes).ToLowerInvariant();
         }
 
-        public static IncrementalHash InitializeSha256Hash() {
-            var fileHasher = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
-            return fileHasher;
+        public static IncrementalHash CreateSha256Hash() {
+            return IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
         }
 
-        public static string GenerateSha256Hash(IncrementalHash hash) {
+        public static string GetSha256Hash(IncrementalHash hash) {
             byte[] fileHashBytes = hash.GetHashAndReset();
-            string fileHash = Convert.ToHexString(fileHashBytes).ToLowerInvariant();
-            return fileHash;
+            return Convert.ToHexString(fileHashBytes).ToLowerInvariant();
         }
     }
 }

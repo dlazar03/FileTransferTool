@@ -42,6 +42,10 @@ try
 
     return 0;
 }
+catch (OperationCanceledException) {
+    Console.Error.WriteLine("File transfer operation was canceled.");
+    return 1;
+}
 catch (Exception ex) {
     Console.Error.WriteLine($"Error occured: {ex.Message}");
     return 1;
