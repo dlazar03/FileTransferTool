@@ -47,6 +47,9 @@ FileTransferTool/
 - The source file hash is built incrementally as chunks are processed. To be able to correctly verify the destination file hash, the same process is applied.
 - A retry mechanism is added so that hash mismatch and I/O failures are handled.
 - The stream Position is re-set to the offset before both the write & read ops since in case of a retry it would've already moved to the next chunk.
+
+## Tests
+Couple of tests are added to cover the main logic in a separate branch. (No best practices followed, just a quick setup to verify main flows)
   
 ## Proposal (concurrency tbd)
 While the concurrent processing part is omitted due to time constraints, here's a conceptual solution:
