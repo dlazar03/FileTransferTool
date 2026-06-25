@@ -14,6 +14,11 @@ namespace FileTransferTool
             _transferData = transferData;
         }
 
+        /// <summary>
+        /// Transfers the source file to the destination file in chunks, verifies each chunk's integrity using MD5 hash, 
+        /// and compares the overall SHA256 hash of the source and destination files.
+        /// </summary>
+        /// <param name="cancellationToken">Token to cancel the transfer</param>
         public async Task TransferAsync(CancellationToken cancellationToken) {
             using var sourceFileHasher = HashUtil.CreateSha256Hash();
             var fileChunks = await TransferChunksAsync(sourceFileHasher, cancellationToken);
@@ -21,18 +26,26 @@ namespace FileTransferTool
             await CompareAndLogFileHashes(sourceFileHasher, _transferData.DestinationFilePath, cancellationToken);
         }
 
+        /// <summary>
+        /// Reads the source file in chunkks, writes each chunk to the destination with retry on mismatch verification,
+        /// updates incremental hash for the source file. 
+        /// Result is a list of processed chunks with index, offset, size, md5 hash and retry count.
+        /// </summary>
+        /// <param name="sourceFileHasher">Incremental SHA256 hasher updated on each read chunk.</param>
+        /// <param name="cancellationToken">Token to cancel the transfer.</param>
+        /// <returns>List of <see cref="ChunkData"/>records describing each transferred chunk.</returns>
         private async Task<List<ChunkData>> TransferChunksAsync(IncrementalHash sourceFileHasher, CancellationToken cancellationToken) {
             var sourceBuffer = new byte[_transferData.FileChunkSize];
             var destinationBuffer = new byte[_transferData.FileChunkSize];
             var fileChunks = new List<ChunkData>();
 
-            await using var sourceFileStream = 
-                new FileStream(_transferData.SourceFilePath, FileMode.Open, FileAccess.Read, 
+            await using var sourceFileStream =
+                new FileStream(_transferData.SourceFilePath, FileMode.Open, FileAccess.Read,
                 FileShare.Read, bufferSize: 4096, useAsync: true);
 
-            await using var destinationFileStream = 
-                new FileStream(_transferData.DestinationFilePath, FileMode.Create, FileAccess.ReadWrite, 
-                FileShare.Read, bufferSize:4096, useAsync: true);
+            await using var destinationFileStream =
+                new FileStream(_transferData.DestinationFilePath, FileMode.Create, FileAccess.ReadWrite,
+                FileShare.Read, bufferSize: 4096, useAsync: true);
 
             long totalBytes = sourceFileStream.Length;
             long offset = 0;
@@ -50,7 +63,7 @@ namespace FileTransferTool
 
                 int retryCount = await WriteChunkWithRetryAsync(
                     destinationFileStream, sourceBuffer, destinationBuffer,
-                    new ChunkContext(chunkIndex, offset, chunkLength, currentSourceChunkMd5Hash), 
+                    new ChunkContext(chunkIndex, offset, chunkLength, currentSourceChunkMd5Hash),
                     cancellationToken);
 
                 fileChunks.Add(new ChunkData
@@ -64,13 +77,25 @@ namespace FileTransferTool
 
                 offset += chunkLength;
                 chunkIndex++;
+                DisplayProgress(offset, totalBytes);
             }
             return fileChunks;
         }
 
+        /// <summary>
+        /// Writes a chunk to the destination file, reads it back and verifies md5 hash matches the expected hash.
+        /// Retries on hash mismatch and transient I/O errors up to the max num of retries defined in TransferData.
+        /// </summary>
+        /// <param name="destinationFileStream">Read/Write stream positioned at the destination file.</param>
+        /// <param name="sourceBuffer">Buffer holding the source chunk bytes.</param>
+        /// <param name="destinationBuffer">Buffer used for the verification read back.</param>
+        /// <param name="chunk">Chunk metadata <see cref="ChunkContext"/></param>
+        /// <param name="cancellationToken">Token to cancel the transfer.</param>
+        /// <returns>The number of retries needed to process the chunk. 0 - success on first attempt, otherwise retried.</returns>
+        /// <exception cref="IOException">Throws I/O exception if the chunk cannot be verified after the max retry attempts.</exception>
         private async Task<int> WriteChunkWithRetryAsync(
             FileStream destinationFileStream,
-            byte[] sourceBuffer, 
+            byte[] sourceBuffer,
             byte[] destinationBuffer,
             ChunkContext chunk,
             CancellationToken cancellationToken)
@@ -112,7 +137,7 @@ namespace FileTransferTool
                             $"retrying... {retry + 1} of {_transferData.MaxRetries}");
                     }
                 }
-                catch (IOException ex) when (retry < _transferData.MaxRetries) { 
+                catch (IOException ex) when (retry < _transferData.MaxRetries) {
                     Console.WriteLine($"I/O error occurred while transferring chunk at index: {chunk.Index}, Error: {ex.Message} " +
                         $"retrying... {retry + 1} of {_transferData.MaxRetries}.");
                     await Task.Delay(TimeSpan.FromMilliseconds(100), cancellationToken);
@@ -140,7 +165,7 @@ namespace FileTransferTool
             }
         }
 
-        private async Task<string> GenerateFileSha256Hash(string filePath, CancellationToken cancellationToken) { 
+        private async Task<string> GenerateFileSha256Hash(string filePath, CancellationToken cancellationToken) {
             int bufferSize = 1024 * 1024;
 
             await using var fileStream =
@@ -164,12 +189,19 @@ namespace FileTransferTool
             return HashUtil.GetSha256Hash(fileHasher);
         }
 
-        private static void LogFileChunksData(List<ChunkData> fileChunks) { 
+        private static void LogFileChunksData(List<ChunkData> fileChunks) {
             foreach (var chunk in fileChunks)
             {
-                Console.WriteLine($"Chunk index: {chunk.Index}, offset: {chunk.Offset}, size: {chunk.Size}, " +
+                Console.WriteLine($"Chunk index: {chunk.Index + 1}, offset: {chunk.Offset}, size: {chunk.Size}, " +
                     $"md5 hash: {chunk.Md5Hash}, retries: {chunk.RetryCount}");
             }
+        }
+
+        private static void DisplayProgress(long bytesTransferred, long totalBytes)
+        {
+            if (totalBytes <= 0) return;
+            double progressPercentage = ((double)bytesTransferred / totalBytes) * 100;
+            Console.WriteLine($"Progress: {progressPercentage:F2}% ({bytesTransferred}/{totalBytes} bytes)");
         }
 
         private readonly record struct ChunkContext(int Index, long Offset, int Length, string ExpectedMd5Hash);
