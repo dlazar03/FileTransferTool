@@ -48,3 +48,6 @@ FileTransferTool/
 - A retry mechanism is added so that hash mismatch and I/O failures are handled.
 - The stream Position is re-set to the offset before both the write & read ops since in case of a retry it would've already moved to the next chunk.
   
+## Proposal (concurrency tbd)
+While the concurrent processing part is omitted due to time constraints, here's a conceptual solution:
+Utilize the Producer-Consumer pattern where a queue sits between the chunk reading and writing. This can be achieved with Channel (System.Threading.Channels) which is thread safe, asynchronous queue. A producer will read from the source, hash with md5 and perform the file hash, the push this data to the queue. A consumer(s) will read from the queue and perform the write and hash verification work at the destination. Chunk data should be stored in a structure like ConcurrentDictionary which will be sorted at the end.
